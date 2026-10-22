@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Map Collapse iOS Spec</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column; tables and code scroll inside their own boxes */
+:root {
+  --bg: #f6f8f9; --surface: #ffffff; --ink: #17232b; --muted: #5b6b75; --line: #dde4e8;
+  --accent: #0b8aa3; --accent-soft: #e3f3f6; --code-bg: #f0f4f6;
+  --font-ui: "Instrument Sans", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11181d; --surface: #182229; --ink: #e6edf1; --muted: #93a3ad; --line: #2b3943;
+  --accent: #4cc3db; --accent-soft: #163640; --code-bg: #0d1418; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11181d; --surface: #182229; --ink: #e6edf1; --muted: #93a3ad; --line: #2b3943;
+  --accent: #4cc3db; --accent-soft: #163640; --code-bg: #0d1418; color-scheme: dark; }
+
+body { background: var(--bg); color: var(--ink); font: 15.5px/1.6 var(--font-ui); }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 36px; }
+header { display: flex; flex-direction: column; gap: 10px; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font-size: 32px; line-height: 1.15; font-weight: 700; text-wrap: balance; }
+h2 { margin: 0; font-size: 20px; font-weight: 600; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.lede { color: var(--muted); font-size: 16.5px; }
+section { display: flex; flex-direction: column; gap: 14px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+code, .mono { font-family: var(--font-mono); font-size: .88em; }
+p code, li code, td code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.fact { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.fact b { font-family: var(--font-mono); font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.fact span { color: var(--muted); font-size: 13px; }
+.table-box { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: var(--code-bg); }
+td.num { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+pre { margin: 0; overflow-x: auto; background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px; padding: 16px; font: 13px/1.6 var(--font-mono); color: var(--ink); }
+ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-width: 65ch; }
+.note { background: var(--accent-soft); border-radius: 10px; padding: 12px 16px; font-size: 14.5px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Rides · Review your booking</div>
+    <h1>Map collapse on scroll: iOS spec</h1>
+    <p class="lede">As the sheet scrolls up, the map fades out and a glass header with the title fades in. There are two versions. All values come from the prototype and are in points.</p>
+    <p><a href="./">Open the interactive demo</a></p>
+  </header>
+
+  <section>
+    <h2>Key numbers</h2>
+    <div class="facts">
+      <div class="fact"><b>0 → 120 pt</b><span>Scroll range for the whole effect</span></div>
+      <div class="fact"><b>easeInOutQuad</b><span>Curve for the map fade</span></div>
+      <div class="fact"><b>70 → 120 pt</b><span>Header and title fade in</span></div>
+      <div class="fact"><b>0 or 120 pt</b><span>Snap positions on release</span></div>
+    </div>
+    <p>The animation is driven by scroll position, not time. <code>y</code> is the scroll offset from rest: <code>contentOffset.y + adjustedContentInset.top</code>. Each value below is a pure function of <code>y</code>, so it follows the finger exactly and reverses when the user scrolls back.</p>
+  </section>
+
+  <section>
+    <h2>Both versions</h2>
+    <div class="table-box"><table>
+      <thead><tr><th>Element</th><th>Property</th><th>Scroll range</th><th>Curve</th><th>From → to</th></tr></thead>
+      <tbody>
+        <tr><td>Map</td><td>alpha</td><td class="num">0 → 120</td><td>easeInOutQuad</td><td class="num">1 → 0</td></tr>
+        <tr><td>Route pins (labels)</td><td>alpha</td><td class="num">0 → 54</td><td>linear</td><td class="num">1 → 0</td></tr>
+        <tr><td>Expand map button</td><td>alpha</td><td class="num">0 → 54</td><td>linear</td><td class="num">1 → 0</td></tr>
+        <tr><td>Header glass</td><td>alpha</td><td class="num">70 → 120</td><td>linear</td><td class="num">0 → 1</td></tr>
+        <tr><td>Title</td><td>alpha</td><td class="num">70 → 120</td><td>easeOutCubic</td><td class="num">0 → 1</td></tr>
+        <tr><td>Title</td><td>translateY</td><td class="num">70 → 120</td><td>easeOutCubic</td><td class="num">+6 → 0 pt</td></tr>
+        <tr><td>Back button</td><td>none</td><td colspan="3">Always visible, never animates</td></tr>
+      </tbody>
+    </table></div>
+    <p>At rest the header has no background and no title. Only the back button sits over the map.</p>
+  </section>
+
+  <section>
+    <h2>Extra motion in Parallax + blur <span class="pill">Version A</span></h2>
+    <p>Fade only <span class="pill">Version B</span> skips this table. The map does not move, scale or blur there.</p>
+    <div class="table-box"><table>
+      <thead><tr><th>Element</th><th>Property</th><th>Scroll range</th><th>Curve</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Map</td><td>translateY</td><td class="num">all y</td><td>linear</td><td class="num">−0.45 × y</td></tr>
+        <tr><td>Map</td><td>scale (anchor top-centre)</td><td class="num">0 → 120</td><td>easeInOutQuad</td><td class="num">1 → 1.04</td></tr>
+        <tr><td>Map</td><td>blur radius</td><td class="num">0 → 120</td><td>easeInOutQuad</td><td class="num">0 → 6 pt</td></tr>
+        <tr><td>Expand map button</td><td>translateY</td><td class="num">all y</td><td>linear</td><td class="num">−0.45 × y</td></tr>
+        <tr><td>Expand map button</td><td>scale</td><td class="num">0 → 54</td><td>linear</td><td class="num">1 → 0.85</td></tr>
+      </tbody>
+    </table></div>
+    <p>So the map moves at 45% of the scroll speed (parallax) while it fades. The prototype has no overscroll; use <code>max(y, 0)</code> for the parallax unless you want the map to follow a pull-down.</p>
+  </section>
+
+  <section>
+    <h2>Glass header</h2>
+    <ul>
+      <li>Use a system material, such as <code>.systemUltraThinMaterial</code>, or the system glass effect on newer iOS. The prototype approximates it with a 14 pt blur at 180% saturation over a white tint that goes from 78% to 62% opacity.</li>
+      <li>Height is 128 pt on a 393 pt wide screen: the status bar, the nav row and a soft tail. The bottom 28% fades to transparent through a gradient mask, so it has no hard edge.</li>
+      <li>Fade it with the alpha of a container view that holds the effect view. Setting <code>alpha</code> on a <code>UIVisualEffectView</code> directly breaks the effect.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Snapping</h2>
+    <p>If the user lets go between the two states, the sheet settles to fully open (<code>y = 0</code>) or docked (<code>y = 120</code>), whichever is closer. The midpoint is 60.</p>
+    <p>The dock position puts the card's top edge 8 pt below the header, so the whole card is visible: 232 (card top) − 104 (header) − 8 = 120. On device, work it out from the real layout: <code>cardTop − headerMaxY − 8</code>. Outside that range, scrolling is free and nothing snaps.</p>
+    <p class="note">The web prototype snaps 140 ms after scrolling stops. On iOS it's better to use the projected target in <code>scrollViewWillEndDragging</code>, as in the code below, so a quick flick follows its momentum.</p>
+  </section>
+
+  <section>
+    <h2>Reference code (UIKit)</h2>
+<pre><code>func clamp(_ v: CGFloat) -&gt; CGFloat { min(max(v, 0), 1) }
+func easeInOutQuad(_ t: CGFloat) -&gt; CGFloat { t &lt; 0.5 ? 2*t*t : 1 - pow(-2*t + 2, 2) / 2 }
+func easeOutCubic(_ t: CGFloat) -&gt; CGFloat { 1 - pow(1 - t, 3) }
+
+let fadeEnd: CGFloat = 120, headerSpan: CGFloat = 50, dock: CGFloat = 120
+
+func scrollViewDidScroll(_ sv: UIScrollView) {
+    let y = sv.contentOffset.y + sv.adjustedContentInset.top
+    let p = easeInOutQuad(clamp(y / fadeEnd))
+    let early = clamp(y / (fadeEnd * 0.45))            // 0 → 54
+
+    mapContainer.alpha = 1 - p
+    pinsView.alpha = 1 - early
+    expandButton.alpha = 1 - early
+
+    if style == .parallaxBlur {
+        let lift = -0.45 * max(y, 0)
+        let s = 1 + 0.04 * p                            // anchorPoint (0.5, 0)
+        mapContainer.transform = CGAffineTransform(scaleX: s, y: s)
+            .concatenating(CGAffineTransform(translationX: 0, y: lift))
+        mapBlur.radius = 6 * p                          // see the note on blur
+        let b = 1 - 0.15 * early
+        expandButton.transform = CGAffineTransform(scaleX: b, y: b)
+            .concatenating(CGAffineTransform(translationX: 0, y: lift))
+    }
+
+    let h = clamp((y - (fadeEnd - headerSpan)) / headerSpan)   // 70 → 120
+    headerGlassContainer.alpha = h
+    let t = easeOutCubic(h)
+    titleLabel.alpha = t
+    titleLabel.transform = CGAffineTransform(translationX: 0, y: 6 * (1 - t))
+}
+
+func scrollViewWillEndDragging(_ sv: UIScrollView, withVelocity v: CGPoint,
+                               targetContentOffset target: UnsafeMutablePointer&lt;CGPoint&gt;) {
+    let inset = sv.adjustedContentInset.top
+    let y = target.pointee.y + inset
+    guard y &gt; 0, y &lt; dock else { return }
+    target.pointee.y = (y &lt; dock / 2 ? 0 : dock) - inset
+}</code></pre>
+    <p><b>Blur:</b> UIKit has no blur-radius property. Use SwiftUI <code>.blur(radius:)</code> on the map, a <code>CIGaussianBlur</code> on a map snapshot, or a paused <code>UIViewPropertyAnimator</code> on a blur effect driven by <code>fractionComplete = p</code>. The radius only needs to be close to 6 pt.</p>
+  </section>
+
+  <section>
+    <h2>Accessibility</h2>
+    <ul>
+      <li>When Reduce Motion is on, use Fade only, with no parallax, scale or blur.</li>
+      <li>VoiceOver should always be able to read the title, even while it is hidden over the map. Hide it visually, not from accessibility.</li>
+    </ul>
+  </section>
+</div>
+
+</html>
